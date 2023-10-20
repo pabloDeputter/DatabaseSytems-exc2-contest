@@ -12,7 +12,7 @@ user_columns = ['id', 'name', 'email', 'phone', 'company', 'street', 'street_num
 def generate_data(size):
     users = []
     fake = Faker()
-    for i in range(0, size):
+    for i in range(size):
         user = [i, fake.name(), fake.ascii_email(), fake.basic_phone_number(), fake.company(), fake.street_name(),
                 random.randint(1, 1000), fake.zipcode(), fake.country(),
                 f'{random.randint(1970, 2005)}-{random.randint(1, 12)}-{random.randint(1, 28)}']
@@ -30,7 +30,7 @@ def generate_data(size):
       -> Convert to timestamp  with 32bits
     """
     df['birthdate_ts'] = df['birthdate'].apply(lambda s: pd.to_datetime(s, format='%Y-%m-%d'))
-    df['birthdate_ts'] = df['birthdate_ts'].astype(int) / 10 ** 9
+    df['birthdate_ts'] = df['birthdate_ts'].astype('int64') / 10 ** 9
 
     df = df[['id', 'name', 'email', 'phone', 'company', 'street', 'street_number', 'zipcode', 'country_dct',
              'birthdate_ts']]
