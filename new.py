@@ -1,14 +1,17 @@
 # Database Page is normally between 512B and 16KB
 import random
+import base64
 
 PAGE_SIZE = 512
+OFFSET_SIZE = 4
+LENGTH_SIZE = 4
 
 
 class PageFooter:
     def __init__(self):
         # Pointer to free space
         self.free_space_pointer = 0
-        # Contains pairs (length, offset to beginning of record), if offset == -1, then record is deleted
+        # Contains pairs (offset to beginning of record, length of record), if offset == -1, then record is deleted
         self.slot_dir = []
         self.slot_entry_size = 8
         self.free_space_pointer_size = 4
@@ -17,7 +20,8 @@ class PageFooter:
         return len(self.slot_dir)
 
     def data(self) -> bytearray:
-        return bytearray(len(self.slot_dir).to_bytes(4, byteorder='little') + self.free_space_pointer.to_bytes(4, byteorder='little'))
+        return bytearray(len(self.slot_dir).to_bytes(4, byteorder='little') + self.free_space_pointer.to_bytes(4,
+                                                                                                               byteorder='little'))
 
 
 class Page:
@@ -50,28 +54,30 @@ class Page:
         """
         needed_space = len(record) + self.page_footer.slot_entry_size
         if needed_space <= self.free_space():
-            # Add new slot
-            self.page_footer.slot_dir.append((len(record), self.page_footer.free_space_pointer))
-            # Update free space pointer
-            self.page_footer.free_space_pointer += len(record)
-            # Update page footer
-            self.update_header()
-
-
-            # Update slots
-            new_slot_offset = self.page_footer.slot_count() * self.page_footer.slot_entry_size
-            self.data[new_slot_offset:new_slot_offset + 4] = len(record).to_bytes(4, 'little')
-            self.data[new_slot_offset + 4: new_slot_offset + 8] = self.page_footer.free_space_pointer.to_bytes(4, 'little')
-
             # Write data
             self.data[self.page_footer.free_space_pointer:self.page_footer.free_space_pointer + len(record)] = record
 
-            # Update number of records stored
+            # Add new slot
+            new_slot_offset = self.page_footer.slot_count() * self.page_footer.slot_entry_size
+
+            # Update slots                             static footer size              sizeof current slots        size of new slot
+            new_slot_offset = PAGE_SIZE - self.page_footer.free_space_pointer_size * 2 - new_slot_offset - self.page_footer.slot_entry_size
+            # (offset, length)
+            self.data[new_slot_offset: new_slot_offset + 4] = self.page_footer.free_space_pointer.to_bytes(4, 'little')
+            self.data[new_slot_offset + 4: new_slot_offset + 8] = len(record).to_bytes(4, 'little')
+
+            # Update page footer
+            self.page_footer.slot_dir.append((self.page_footer.free_space_pointer, len(record)))
+
+            # Update free space pointer
+            self.page_footer.free_space_pointer += len(record)
+            self.update_header()
+
             return True
         return False
 
     def delete_record(self, slot_id):
-        length, offset = self.page_footer.slot_dir[slot_id]
+        offset, length = self.page_footer.slot_dir[slot_id]
         self.page_footer.slot_dir[slot_id] = (length, -1)
 
     def is_full(self):
@@ -86,17 +92,58 @@ class Page:
     def compact_page(self):
         """
         Reclaim unused space so that records are contiguous and limit fragmentation.
+
+        Eager -> compact page when a record is deleted
+        Lazy -> compact page when page is full
         """
         write_ptr = 0
 
         for i, (length, offset) in enumerate(self.page_footer.slot_dir):
-            if offset != -1:  # Skip deleted records
-                if write_ptr != offset:  # No need to move if it's already in the right place
+            # Skip deleted records
+            if offset != -1:
+                if offset != write_ptr:
                     self.data[write_ptr:write_ptr + length] = self.data[offset:offset + length]
                 self.page_footer.slot_dir[i] = (length, write_ptr)
                 write_ptr += length
 
         self.page_footer.free_space_pointer = write_ptr
+
+    def dump(self):
+        print("=== Data Byte Dump ===")
+
+        for i, byte in enumerate(self.data):
+            if i % 16 == 0:
+                print()
+            print(f"{byte:02x} ", end='')
+        print("\n")
+
+        print("=== Footer Dump ===")
+        print(f"Free Space Pointer: {self.page_footer.free_space_pointer}")
+        print(
+            f"Free Space Pointer (bytes): {int.from_bytes(self.data[-self.page_footer.free_space_pointer_size:], 'little')}")
+
+        print(f"Number of slots: {self.page_footer.slot_count()}")
+        print(
+            f"Number of slots (bytes): {int.from_bytes(self.data[PAGE_SIZE - self.page_footer.free_space_pointer_size * 2:PAGE_SIZE - self.page_footer.free_space_pointer_size], 'little')}")
+        print("\n")
+
+        print("=== Record Dump ===")
+        print("Slot: offset | length")
+        print("==========")
+        for i, (offset, length) in enumerate(self.page_footer.slot_dir):
+            if offset == -1:
+                print(f"Record {i}: Deleted")
+                continue
+            record_bytes = self.data[offset:offset + length]
+            print(f"Slot {i}: {offset} | {length}")
+
+            slot_offset = -(self.page_footer.free_space_pointer_size * 2) - (i + 1) * self.page_footer.slot_entry_size
+            record_offset = self.data[slot_offset: slot_offset + 4]
+            record_length = self.data[slot_offset + 4: slot_offset + 8]
+            print(
+                f"Slot (bytes): {int.from_bytes(record_offset, 'little')} | {int.from_bytes(record_length, 'little')}")
+            print(f"Record {i} (bytes): {record_bytes}")
+            print(f"Record {i}: {int.from_bytes(record_bytes, 'little')}")
 
 
 class PageDirectory(Page):
@@ -158,6 +205,9 @@ class HeapFile:
         if page_id < len(self.pages):
             self.pages[page_id].delete_record(slot_id)
 
+    def update_record(self):
+        pass
+
     def close(self):
         with open(self.file_path, 'wb') as file:
             for page_dir in self.page_directories:
@@ -183,6 +233,9 @@ class Controller:
 if __name__ == '__main__':
     orm = Controller('database.bin')
 
-    for i in range(1, 11):
-        orm.insert(bytearray(f'{i}'.encode('UTF-8')))
+    for i in range(20, 23):
+        # orm.insert(i.to_bytes(2, 'little'))
+        orm.insert(bytearray(i.to_bytes(2, byteorder='little')))
         orm.commit()
+
+    orm.heap_file.page_directories[0].pages[1].dump()
