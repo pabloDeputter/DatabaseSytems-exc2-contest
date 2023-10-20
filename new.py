@@ -10,11 +10,16 @@ LENGTH_SIZE = 4
 class PageFooter:
     def __init__(self):
         # Pointer to free space
-        self.free_space_pointer = 0
+        self.free_space_pointer = int.from_bytes(data[-4:], 'little')
+        slot_count = int.from_bytes(data[-8:-4], 'little')
         # Contains pairs (offset to beginning of record, length of record), if offset == -1, then record is deleted
-        self.slot_dir = []
+
         self.slot_entry_size = 8
-        self.free_space_pointer_size = 4
+        self.slot_dir = []
+        for i in range(slot_count):
+            slot = int.from_bytes(data[-8 - (i + 1) * self.slot_entry_size:-8 - i * self.slot_entry_size], 'little')
+            offset, length = slot[:4], slot[4:]
+            self.slot_dir.append((offset, length))
 
     def slot_count(self):
         return len(self.slot_dir)
@@ -77,6 +82,9 @@ class Page:
         return False
 
     def delete_record(self, slot_id):
+        """
+        if deleted --> fix fragmentation
+        """
         offset, length = self.page_footer.slot_dir[slot_id]
         self.page_footer.slot_dir[slot_id] = (length, -1)
 
