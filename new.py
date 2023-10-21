@@ -378,16 +378,17 @@ if __name__ == '__main__':
     #
 
     schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
-    record = (1, "Aliceeee", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
-    record_2 = (2, "Bob", 23, 12345, 987654, 4, "bob@email.com", "1234567890", "ACME", "Elm St")
-    # orm.insert(record, schema)
-    # orm.insert(record_2, schema)
+    record = (8, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
+    # for i in range(7):
+    #     record = (i, ) + record[1:]
+    orm.insert(record, schema)
+
 
     # orm.update(2, (2, "AAAAAAAAAAAAA", 23, 12345, 987654, 4, "a", "1", "ACME", "Elm St"), schema)
     # orm.delete(1)
     # orm.heap_file.page_directories[0].pages[1].dump()
 
-    print(utils.decode_record(orm.read(2), schema))
+    # print(utils.decode_record(orm.read(2), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
