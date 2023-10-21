@@ -359,6 +359,10 @@ class Controller:
         byte_id = utils.encode_record([id_], ['int'])
         return self.heap_file.read(byte_id)
 
+    def delete(self, id_: int):
+        (page, slot_id) = self.heap_file.find_record(utils.encode_record([id_], ['int']))
+        page.delete_record(slot_id)
+
     def commit(self):
         self.heap_file.close()
 
