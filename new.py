@@ -20,7 +20,7 @@ class PageFooter:
         # Pointer to free space
         self.free_space_pointer = int.from_bytes(data[-4:], 'little')
         slot_count = int.from_bytes(data[-8:-4], 'little')
-        # Contains pairs (offset to beginning of record, length of record), if offset == -1, then record is deleted
+        # Contains pairs (offset to beginning of record, length of record), if length == 0, then record is deleted
 
         self.slot_entry_size = 8
         self.slot_dir = []
@@ -59,7 +59,7 @@ class Page:
     def insert_record(self, record: bytearray):
         """
         If there is not enough free space -> try to compact data, and use this free space, otherwise record can't be stored
-        First check if there is a slot with -1 as offset, to overwrite this
+        First check if there is a slot with 0 as length, to overwrite this
         :param record:
         :return:
         """
@@ -85,12 +85,13 @@ class Page:
 
             else:
                 index = 0
-                for i, (offset, _) in enumerate(self.page_footer.slot_dir):
-                    if offset == -1:
+                for i, (_, length) in enumerate(self.page_footer.slot_dir):
+                    if length == 0:
                         index = i
 
                 # Update slots
-                new_slot_offset = (PAGE_SIZE - FREE_SPACE_POINTER_SIZE * 2) - (self.page_footer.slot_entry_size * index)
+                new_slot_offset = (PAGE_SIZE - FREE_SPACE_POINTER_SIZE * 2) - (
+                        self.page_footer.slot_entry_size * (index + 1))
                 self.data[new_slot_offset: new_slot_offset + 4] = self.page_footer.free_space_pointer.to_bytes(4,
                                                                                                                'little')
                 self.data[new_slot_offset + 4: new_slot_offset + 8] = len(record).to_bytes(4, 'little')
@@ -107,10 +108,10 @@ class Page:
 
     def delete_record(self, slot_id):
         offset, length = self.page_footer.slot_dir[slot_id]
-        # TODO - write to bytes new slot
-        self.page_footer.slot_dir[slot_id] = (-1, length)
-        new_slot_offset = (PAGE_SIZE - FREE_SPACE_POINTER_SIZE * 2) - (self.page_footer.slot_entry_size * slot_id)
-        self.data[new_slot_offset + 4:new_slot_offset + 8] = length.to_bytes(4, 'little')
+        self.page_footer.slot_dir[slot_id] = (offset, 0)
+        new_slot_offset = (PAGE_SIZE - FREE_SPACE_POINTER_SIZE * 2) - (self.page_footer.slot_entry_size * (slot_id + 1))
+        number = 0
+        self.data[new_slot_offset + 4:new_slot_offset + 8] = number.to_bytes(4, 'little')
         # Fix fragmentation
         self.compact_page()
 
@@ -126,12 +127,16 @@ class Page:
             return True
         # If new record is smaller, we need to compact the page to avoid fragmentation
         elif len(new_record) < length:
-            self.data[offset:offset + length] = new_record
+            self.data[offset:offset + len(new_record)] = new_record
+            new_slot_offset = (PAGE_SIZE - FREE_SPACE_POINTER_SIZE * 2) - (
+                    self.page_footer.slot_entry_size * (slot_id + 1))
+            self.page_footer.slot_dir[slot_id] = (offset, len(new_record))
+            self.data[new_slot_offset + 4:new_slot_offset + 8] = len(new_record).to_bytes(4, 'little')
             self.compact_page()
             return True
         # New record is lager, we can just insert the record
         else:
-            # Delete record, slot offset will be set to -1
+            # Delete record, length will be set to -1
             self.delete_record(slot_id)
             # If returns True, enough free space on the page and slot_id stays the same, else we need to find a new page
             return self.insert_record(new_record)
@@ -150,7 +155,7 @@ class Page:
         """
         Check if page is packed, meaning no deleted records.
         """
-        return all(offset != -1 for offset, length in self.page_footer.slot_dir)
+        return all(length != 0 for offset, length in self.page_footer.slot_dir)
 
     def compact_page(self):
         """
@@ -161,15 +166,21 @@ class Page:
         """
         write_ptr = 0
 
-        for i, (length, offset) in enumerate(self.page_footer.slot_dir):
+        for i, (offset, length) in enumerate(self.page_footer.slot_dir):
             # Skip deleted records
-            if offset != -1:
+            if length != 0:
                 if offset != write_ptr:
                     self.data[write_ptr:write_ptr + length] = self.data[offset:offset + length]
-                self.page_footer.slot_dir[i] = (length, write_ptr)
+                self.page_footer.slot_dir[i] = (write_ptr, length)
+                # Update slots in bytes
+                new_slot_offset = (PAGE_SIZE - FREE_SPACE_POINTER_SIZE * 2) - (
+                            self.page_footer.slot_entry_size * (i + 1))
+                self.data[new_slot_offset: new_slot_offset + 4] = write_ptr.to_bytes(4, 'little')
+                self.data[new_slot_offset + 4: new_slot_offset + 8] = length.to_bytes(4, 'little')
                 write_ptr += length
 
         self.page_footer.free_space_pointer = write_ptr
+        self.update_header()
 
     def dump(self):
         print("=== Data Byte Dump ===")
@@ -366,18 +377,22 @@ if __name__ == '__main__':
     #     df.to_csv('users.csv', index=False)
     #
 
-    # schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
-    # record.insert(record, schema)
-    # orm.update(1, (1, "B", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St"), schema)
-    orm.delete(1)
-    orm.heap_file.page_directories[0].pages[1].dump()
+    schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
+    record = (1, "Aliceeee", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
+    record_2 = (2, "Bob", 23, 12345, 987654, 4, "bob@email.com", "1234567890", "ACME", "Elm St")
+    # orm.insert(record, schema)
+    # orm.insert(record_2, schema)
 
-    # print(utils.decode_record(orm.read(1), schema))
+    # orm.update(2, (2, "AAAAAAAAAAAAA", 23, 12345, 987654, 4, "a", "1", "ACME", "Elm St"), schema)
+    # orm.delete(1)
+    # orm.heap_file.page_directories[0].pages[1].dump()
+
+    print(utils.decode_record(orm.read(2), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
     #     orm.insert(bytearray(i.to_bytes(2, byteorder='little')))
     #     orm.commit()
 
-    # orm.heap_file.page_directories[0].pages[1].dump()
+    orm.heap_file.page_directories[0].pages[1].dump()
     orm.commit()
