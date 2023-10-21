@@ -25,9 +25,9 @@ class PageFooter:
         self.slot_entry_size = 8
         self.slot_dir = []
         for i in range(slot_count):
-            slot = int.from_bytes(data[-8 - (i + 1) * self.slot_entry_size:-8 - i * self.slot_entry_size], 'little')
+            slot = data[-8 - (i + 1) * self.slot_entry_size:-8 - i * self.slot_entry_size]
             offset, length = slot[:4], slot[4:]
-            self.slot_dir.append((offset, length))
+            self.slot_dir.append((int.from_bytes(offset, 'little'), int.from_bytes(length, 'little')))
 
     def slot_count(self):
         return len(self.slot_dir)
@@ -263,16 +263,6 @@ class PageDirectory(Page):
 
         self.pages[page_num] = page
 
-        byte_array = bytearray()
-        for num in (page_number, page.free_space()):
-            # Calculate the number of bytes required to represent the integer
-            num_bytes = (num.bit_length() + 7) // 8
-            byte_array.extend(num.to_bytes(num_bytes, byteorder='little'))
-        super().insert_record(byte_array)
-        # if page_number not in self.pages:
-        #     self.pages[page_number] = {'metadata': metadata, 'status': 'in_use'}
-        #     print(f"Created data page {page_number} with metadata: {metadata}")
-
     def delete_data_page(self, page_number):
         # Mark a data page as free in the directory
         if page_number in self.pages:
@@ -280,8 +270,7 @@ class PageDirectory(Page):
             print(f"Deleted data page {page_number}")
 
     def insert_record(self, data: bytearray):
-        page_number = 0
-        for page_number, page in self.pages.items():
+        for page in self.pages.values():
             if page.is_full():
                 # self.full_pages.append(self.pages.pop(page_number))
                 continue
@@ -390,4 +379,5 @@ if __name__ == '__main__':
     #     orm.insert(bytearray(i.to_bytes(2, byteorder='little')))
     #     orm.commit()
 
-    orm.heap_file.page_directories[0].pages[1].dump()
+    # orm.heap_file.page_directories[0].pages[1].dump()
+    orm.commit()
