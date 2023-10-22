@@ -366,11 +366,19 @@ class HeapFile:
                 return page
 
     def close(self):
-        with open(self.file_path, 'wb') as file:
-            file.seek(0)
+        # Create file if it doesn't exist
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, 'wb') as file:
+                file.close()
+
+
+        # TODO - doesn't save other pages
+        with open(self.file_path, 'r+b') as file:
+            # TODO - pagedr needs number so it can be written on the correct place
             for page_dir in self.page_directories:
                 file.write(page_dir.data)
-                for page in page_dir.pages.values():
+                for page_nr, page in page_dir.pages.items():
+                    file.seek(page_nr * PAGE_SIZE)
                     file.write(page.data)
 
 
@@ -413,16 +421,19 @@ if __name__ == '__main__':
     #
 
     schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
-    record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
+    record = (100, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
+    smallrecord = (50, "A", 2, 1, 987654, 4, "", "", "", "")
     # for i in range(14):
     #     record = (i,) + record[1:]
     #     orm.insert(record, schema)
-
+    #
+    # orm.insert(smallrecord, schema)
+    #
     # orm.update(2, (2, "AAAAAAAAAAAAAAAA", 23, 12345, 987654, 4, "a", "1", "ACME", "Elm St"), schema)
     # orm.delete(5)
     # orm.heap_file.page_directories[0].pages[1].dump()
 
-    print(utils.decode_record(orm.read(9), schema))
+    # print(utils.decode_record(orm.read(50), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
