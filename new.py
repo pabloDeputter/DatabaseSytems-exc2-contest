@@ -1,4 +1,5 @@
 import os
+from collections import deque
 from typing import Optional, List, Tuple
 import pandas as pd
 
@@ -17,6 +18,7 @@ FOOTER_SIZE = FREE_SPACE_POINTER_SIZE + NUMBER_SLOTS_SIZE
 # PageDirectory Constants
 PAGE_NUM_SIZE = 3
 FREE_SPACE_SIZE = 3
+CACHE_SIZE = 10
 
 
 class PageFooter:
@@ -43,10 +45,9 @@ class PageFooter:
 
 
 class Page:
-    def __init__(self, data: bytearray = bytearray(PAGE_SIZE)):
-        self.page_footer = PageFooter(data)
-        # Use padding to achieve fixed size
-        self.data = data
+    def __init__(self, data=None):
+        self.data = bytearray(PAGE_SIZE) if data is None else data
+        self.page_footer = PageFooter(self.data)
         page_footer_data = self.page_footer.data()
         self.data[-len(page_footer_data):] = page_footer_data
 
@@ -238,6 +239,7 @@ class PageDirectory(Page):
         super().__init__(data)
 
     def find_page(self, page_number) -> Optional[Page]:
+
         if page_number in self.pages:
             return self.pages[page_number]
 
@@ -252,15 +254,12 @@ class PageDirectory(Page):
                     return page
 
     def find_or_create_data_page_for_insert(self, needed_space):
-        """
-        Creates a new data page and adds it to the directory.
-        :param:page_number The page number to create.
-        Prints a message indicating the new page was created successfully.
-        """
+
         page_num = 0
         for slot_id in range(self.page_footer.slot_count()):
             # loop over slot, read in tuple(record) -> should contain (page num, free space)
-            record = self.read_record(slot_id)
+            offset, length = self.page_footer.slot_dir[slot_id]
+            record = self.data[offset: offset + length]
             page_num, free_space = int.from_bytes(record[:PAGE_NUM_SIZE], 'little'), int.from_bytes(
                 record[FREE_SPACE_SIZE:], 'little')
             if needed_space <= free_space:
@@ -292,16 +291,24 @@ class PageDirectory(Page):
             print(f"Deleted data page {page_number}")
 
     def insert_record(self, data: bytearray):
-        for page in self.pages.values():
+        for nr, page in self.pages.items():
             if page.is_full():
                 # self.full_pages.append(self.pages.pop(page_number))
                 continue
 
             elif page.insert_record(data):
+                self.update_free_space(nr, page.free_space())
                 return True  # Tuple written successfully
         # All existing pages are full, create a new page and write the tuple
-        self.find_or_create_data_page_for_insert(len(data) + + SLOT_ENTRY_SIZE)
+        self.find_or_create_data_page_for_insert(len(data) + SLOT_ENTRY_SIZE)
         return self.insert_record(data)
+
+    def update_free_space(self, page_nr, free_space):
+        # TODO - we must also know the pagedir number
+        # for example when we are in pd55 and we have page56, we want to do rel_page_nr = page56 - pd55 = 1
+        offset, length = self.page_footer.slot_dir[page_nr - 1]
+        self.data[offset + PAGE_NUM_SIZE:offset + PAGE_NUM_SIZE + FREE_SPACE_SIZE] = free_space.to_bytes(
+            FREE_SPACE_SIZE, 'little')
 
     def list_free_pages(self):
         return [page for page, info in self.pages.items() if info['status'] == 'free']
@@ -342,9 +349,12 @@ class HeapFile:
     def find_record(self, byte_id: bytearray) -> (int, int):
         for page_dir in self.page_directories:
             for offset, length in page_dir.page_footer.slot_dir:
-                page_number = int.from_bytes(page_dir.data[offset: offset + 3], 'little')
+                page_number = int.from_bytes(page_dir.data[offset: offset + PAGE_NUM_SIZE], 'little')
                 page: Page = page_dir.find_page(page_number)
-                return page, page.find_record(byte_id)
+                record = page.find_record(byte_id)
+                if record is not None:
+                    return page, record
+        return None, None
 
     def read_record(self, byte_id: bytearray):
         page, slot_id = self.find_record(byte_id)
@@ -357,6 +367,7 @@ class HeapFile:
 
     def close(self):
         with open(self.file_path, 'wb') as file:
+            file.seek(0)
             for page_dir in self.page_directories:
                 file.write(page_dir.data)
                 for page in page_dir.pages.values():
@@ -386,8 +397,11 @@ class Controller:
 
 
 if __name__ == '__main__':
-    # create file database.bin
-    # with open('database.bin', 'wb') as file:
+    # # create file database.bin
+    # with open('database.bin', 'r+b') as file:
+    #     file.seek(1024)
+    #     data = file.read(PAGE_SIZE)
+    #
     #     file.close()
     orm = Controller('database.bin')
 
@@ -400,7 +414,7 @@ if __name__ == '__main__':
 
     schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
     record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
-    # for i in range(3):
+    # for i in range(14):
     #     record = (i,) + record[1:]
     #     orm.insert(record, schema)
 
@@ -408,12 +422,13 @@ if __name__ == '__main__':
     # orm.delete(5)
     # orm.heap_file.page_directories[0].pages[1].dump()
 
-    print(utils.decode_record(orm.read(2), schema))
+    print(utils.decode_record(orm.read(9), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
     #     orm.insert(bytearray(i.to_bytes(2, byteorder='little')))
     #     orm.commit()
 
-    orm.heap_file.page_directories[0].pages[1].dump()
+    # orm.heap_file.page_directories[0].pages[1].dump()
+    print(f"pages: {orm.heap_file.page_directories[0].pages}")
     orm.commit()
