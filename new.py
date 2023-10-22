@@ -328,7 +328,7 @@ class HeapFile:
             # Not enough free space on page, try to find a new page
             self.page_directories[0].insert_record(data)
 
-    def insert(self, data):
+    def insert_record(self, data):
         self.page_directories[0].insert_record(data)
 
     def find_record(self, byte_id: bytearray) -> (int, int):
@@ -338,7 +338,7 @@ class HeapFile:
                 page: Page = page_dir.find_page(page_number)
                 return page, page.find_record(byte_id)
 
-    def read(self, byte_id: bytearray):
+    def read_record(self, byte_id: bytearray):
         page, slot_id = self.find_record(byte_id)
         return page.read_record(slot_id)
 
@@ -346,6 +346,7 @@ class HeapFile:
         for page_directory in self.page_directories:
             if page := page_directory.find_page(page_number):
                 return page
+
 
     def close(self):
         with open(self.file_path, 'wb') as file:
@@ -360,14 +361,14 @@ class Controller:
         self.heap_file = HeapFile(filepath)
 
     def insert(self, data, schema: List[str]):
-        self.heap_file.insert(utils.encode_record(data, schema))
+        self.heap_file.insert_record(utils.encode_record(data, schema))
 
     def update(self, id_: int, data, schema: List[str]):
         self.heap_file.update_record(utils.encode_record([id_], ['int']), utils.encode_record(data, schema))
 
     def read(self, id_: int):
         byte_id = utils.encode_record([id_], ['int'])
-        return self.heap_file.read(byte_id)
+        return self.heap_file.read_record(byte_id)
 
     def delete(self, id_: int):
         (page, slot_id) = self.heap_file.find_record(utils.encode_record([id_], ['int']))
