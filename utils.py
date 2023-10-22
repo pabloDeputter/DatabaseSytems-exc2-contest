@@ -1,4 +1,8 @@
 import struct
+from faker import Faker
+import pandas as pd
+import random
+import csv
 
 from typing import List
 
@@ -53,13 +57,28 @@ def decode_record(byte_array, schema: List[str]):
     return tuple(decoded_fields)
 
 
+def generate_data(file_path: str, rows: int):
+    user_columns = ['id', 'name', 'email', 'phone', 'company', 'street', 'street_number', 'zipcode', 'country',
+                    'birthdate']
+    users = []
+    fake = Faker()
+    for i in range(rows):
+        user = [i, fake.name(), fake.ascii_email(), fake.basic_phone_number(), fake.company(), fake.street_name(),
+                random.randint(1, 1000), fake.zipcode(), fake.country(),
+                f'{random.randint(1970, 2005)}-{random.randint(1, 12)}-{random.randint(1, 28)}']
+        users.append(user)
+    df = pd.DataFrame(users, columns=user_columns)
+    df.to_csv(file_path, index=False)
+
+
 if __name__ == '__main__':
-    schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
-
-    record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
-
-    encoded = encode_record(record, schema)
-    print(len(encoded))
-    print(encoded)
-    decoded = decode_record(encoded, schema)
-    print(decoded)
+    # schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
+    #
+    # record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
+    #
+    # encoded = encode_record(record, schema)
+    # print(len(encoded))
+    # print(encoded)
+    # decoded = decode_record(encoded, schema)
+    # print(decoded)
+    generate_data('fake_users.csv', 100000)
