@@ -24,7 +24,7 @@ class PageFooter:
         # Pointer to free space
         self.free_space_pointer = int.from_bytes(data[-FREE_SPACE_POINTER_SIZE:], 'little')
         # Number of slots
-        slot_count = int.from_bytes(data[-FREE_SPACE_SIZE:-FREE_SPACE_POINTER_SIZE], 'little')
+        slot_count = int.from_bytes(data[-FOOTER_SIZE:-FREE_SPACE_POINTER_SIZE], 'little')
 
         # Contains pairs (offset to beginning of record, length of record), if length == 0, then record is deleted
         self.slot_dir = []
@@ -234,6 +234,7 @@ class PageDirectory(Page):
     def __init__(self, file_path: str = None, data: bytearray = bytearray(PAGE_SIZE)):
         self.pages = {}  # Dictionary to store page information
         self.file_path = file_path
+        self.next_directory = None
         super().__init__(data)
 
     def find_page(self, page_number) -> Optional[Page]:
@@ -329,7 +330,14 @@ class HeapFile:
             self.page_directories[0].insert_record(data)
 
     def insert_record(self, data):
-        self.page_directories[0].insert_record(data)
+        pd = self.page_directories[0]
+        # If directory is full, move to the next one
+        while not pd.insert_record(data) and pd.next_directory is not None:
+            pd = pd.next_directory
+        # If last directory is full, create new directory
+        if pd.next_directory is None:
+            # TODO
+            pass
 
     def find_record(self, byte_id: bytearray) -> (int, int):
         for page_dir in self.page_directories:
@@ -346,7 +354,6 @@ class HeapFile:
         for page_directory in self.page_directories:
             if page := page_directory.find_page(page_number):
                 return page
-
 
     def close(self):
         with open(self.file_path, 'wb') as file:
@@ -380,8 +387,8 @@ class Controller:
 
 if __name__ == '__main__':
     # create file database.bin
-    with open('database.bin', 'wb') as file:
-        file.close()
+    # with open('database.bin', 'wb') as file:
+    #     file.close()
     orm = Controller('database.bin')
 
     # if os.path.exists('users.csv'):
@@ -393,15 +400,15 @@ if __name__ == '__main__':
 
     schema = ['int', 'var_str', 'short', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
     record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
-    for i in range(8):
-        record = (i,) + record[1:]
-        orm.insert(record, schema)
+    # for i in range(3):
+    #     record = (i,) + record[1:]
+    #     orm.insert(record, schema)
 
     # orm.update(2, (2, "AAAAAAAAAAAAAAAA", 23, 12345, 987654, 4, "a", "1", "ACME", "Elm St"), schema)
     # orm.delete(5)
     # orm.heap_file.page_directories[0].pages[1].dump()
 
-    # print(utils.decode_record(orm.read(2), schema))
+    print(utils.decode_record(orm.read(2), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
