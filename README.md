@@ -1,3 +1,8 @@
+### Contributors
+- Pablo Deputter
+- Robin Dillen
+- Gaia Colombo
+
 We developed an unordered heap file to manage variable-length records, with each data page having a size of 4KB. To organize the data pages, we utilized a linked list of page directories, indicating which pages are full.
 
 ### Data Pages & Directories
