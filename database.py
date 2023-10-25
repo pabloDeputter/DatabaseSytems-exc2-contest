@@ -479,7 +479,7 @@ if __name__ == '__main__':
     record = (0, 'Brian Green', 'michaelfarrell@yahoo.com', '9306399309', 'Cruz LLC', 'Berry Cove', 707, 76486, 'Guam',
               '1981-1-9')
     schema = ['int', 'var_str', 'var_str', 'var_str', 'var_str', 'var_str', 'int', 'int', 'var_str', 'var_str']
-    # orm.insert(record, schema)
+    orm.insert(record, schema)
 
     orm.commit()
     print(f"time taken: {time.time() - start}")
