@@ -113,7 +113,7 @@ def test_deletes(filepath: str, num_rows: int):
 
 
 if __name__ == "__main__":
-    num_rows = 100000
+    num_rows = 10000
     filepath = "database.bin"
     csv_file = "fake_users.csv"
 

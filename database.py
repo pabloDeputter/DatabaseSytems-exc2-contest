@@ -476,50 +476,11 @@ if __name__ == '__main__':
     start = time.time()
     orm = Controller('database.bin')
 
-    # schema = ['int', 'var_str', 'int', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
-    # record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
-    # smallrecord = (60, "A", 2, 1, 987654, 4, "", "", "", "")
-    record = (47, 'Brian Green', 'michaelfarrell@yahoo.com', '9306399309', 'Cruz LLC', 'Berry Cove', 707, 76486, 'Guam',
+    record = (0, 'Brian Green', 'michaelfarrell@yahoo.com', '9306399309', 'Cruz LLC', 'Berry Cove', 707, 76486, 'Guam',
               '1981-1-9')
     schema = ['int', 'var_str', 'var_str', 'var_str', 'var_str', 'var_str', 'int', 'int', 'var_str', 'var_str']
     # orm.insert(record, schema)
-    # for i in range(8):
-    #     record = (i,) + record[1:]
-    #     orm.insert(record, schema)
-    # orm.insert(smallrecord, schema)
 
-    # orm.insert(record, schema)
-
-    # orm.update(2, (2, "AAAAAAAAAAAAAAAA", 23, 12345, 987654, 4, "a", "1", "ACME", "Elm St"), schema)
-    # orm.delete(5)
-    # orm.heap_file.page_directories[0].pages[1].dump()
-    # orm.update(9990, (9990, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144, 'Bhutan', '1992-2-4'), schema)
-    # orm.delete(0)
-    # orm.delete(9990)
-
-    orm.update(0, (
-        0, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144,
-        'Bhutan', '1992-2-4'), schema)
-    orm.update(1, (
-        1, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144,
-        'Bhutan', '1992-2-4'), schema)
-    orm.update(2, (
-        2, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144,
-        'Bhutan', '1992-2-4'), schema)
-
-    # print(utils.decode_record(orm.read(0), schema))
-    # print(utils.decode_record(orm.read(1), schema))
-    # print(utils.decode_record(orm.read(2), schema))
-
-    # for i in range(20, 23):
-    #     # orm.insert(i.to_bytes(2, 'little'))
-    #     orm.insert(bytearray(i.to_bytes(2, byteorder='little')))
-    #     orm.commit()
-
-    # orm.heap_file.page_directories[0].pages[1].dump()
-    # print(f"pages: {orm.heap_file.page_directories[0]}")
-    # print(f"free space first pd: {orm.heap_file.page_directories[0].free_space()}")
-    # print(list(orm.heap_file.page_directories[0].pages.values())[-1].free_space())
     orm.commit()
     print(f"time taken: {time.time() - start}")
     print(os.path.getsize('database.bin'))
