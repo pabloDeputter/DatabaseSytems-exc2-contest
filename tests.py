@@ -29,11 +29,12 @@ def test_controller(filepath: str, csv_file: str, num_rows: int):
 
     # Insertion and Timing
     start_time = time.time()
-    for row in csv_data[1:]:
+    for i, row in enumerate(csv_data[1:]):
         casted_row = cast_row_based_on_schema(row, user_schema)
         controller.insert(casted_row, user_schema)
 
     controller.commit()
+    controller = Controller(filepath)
     end_time = time.time()
 
     write_time = end_time - start_time
@@ -64,7 +65,7 @@ def test_controller(filepath: str, csv_file: str, num_rows: int):
 
 if __name__ == "__main__":
     user_schema = ['int', 'var_str', 'var_str', 'var_str', 'var_str', 'var_str', 'int', 'int', 'var_str', 'var_str']
-    num_rows = 100
+    num_rows = 10000
     filepath = "database.bin"
     csv_file = "fake_users.csv"
 

@@ -8,7 +8,7 @@ from typing import List
 
 
 def encode_var_string(s: str):
-    return [len(s)] + list(s.encode('ascii'))
+    return [len(s)] + list(s.encode('UTF-8'))
 
 
 def encode_field(value, field_type: str):
@@ -30,7 +30,7 @@ def encode_field(value, field_type: str):
 def decode_field(byte_array, start_idx, field_type):
     if field_type == 'var_str':
         str_len = byte_array[start_idx]
-        return str(byte_array[start_idx + 1: start_idx + 1 + str_len], 'ascii'), start_idx + 1 + str_len
+        return str(byte_array[start_idx + 1: start_idx + 1 + str_len], 'utf-8'), start_idx + 1 + str_len
     elif field_type == 'int':
         return struct.unpack("<I", byte_array[start_idx:start_idx + 4])[0], start_idx + 4
     elif field_type == 'short':

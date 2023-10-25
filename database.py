@@ -13,8 +13,8 @@ OFFSET_SIZE = 2
 LENGTH_SIZE = 2
 SLOT_ENTRY_SIZE = OFFSET_SIZE + LENGTH_SIZE
 
-FREE_SPACE_POINTER_SIZE = 4
-NUMBER_SLOTS_SIZE = 4
+FREE_SPACE_POINTER_SIZE = 2
+NUMBER_SLOTS_SIZE = 2
 FOOTER_SIZE = FREE_SPACE_POINTER_SIZE + NUMBER_SLOTS_SIZE
 
 # PageDirectory Constants
@@ -59,7 +59,7 @@ class Page:
         self.data[-len(page_footer_data):] = page_footer_data
 
     def free_space(self):
-        # 512 100 - (x * 8) - 4 = 508
+        # 512 - 100 - (x * 8) - 4 = 508
         # Page header grows from bottom up, records grow top down.
         # Free space pointer - space occupied by page header - 4 bytes for free space pointer
         return PAGE_SIZE - self.page_footer.free_space_pointer - (
@@ -267,7 +267,7 @@ class PageDirectory(Page):
         if page_number in self.pages:
             return self.pages[page_number]
 
-        for offset, length in self.page_footer.slot_dir:
+        for offset, length in self.page_footer.slot_dir[1:]:
             data = self.data[offset:offset + length]
             if int.from_bytes(data[:PAGE_NUM_SIZE], 'little') == page_number:
                 # TODO - reading from record that was inserted while file was open and doesn't exist yet gives error
@@ -279,7 +279,7 @@ class PageDirectory(Page):
                     return page
 
     def find_record(self, byte_id: bytearray) -> (int, int):
-        for offset, length in self.page_footer.slot_dir:
+        for offset, length in self.page_footer.slot_dir[1:]:
             page_number = int.from_bytes(self.data[offset: offset + PAGE_NUM_SIZE], 'little')
             page: Page = self.find_page(page_number)
             record = page.find_record(byte_id)
@@ -395,12 +395,11 @@ class HeapFile:
         pd: PageDirectory = self.page_directories[0]
 
         # Iterate over all page dir., if full move to the next one
-        while not pd.insert_record(data) and pd.next_dir != 0:
+        while not (inserted := pd.insert_record(data)) and pd.next_dir != 0:
             pd = self.read_page_dir(pd)
 
-
         # If last dir. is full, create new one
-        if pd.next_dir == 0:
+        if not inserted:
             # Find the max. current page number
             max_page_nr = int.from_bytes(pd.read_record(len(pd.page_footer.slot_dir) - 1)[:PAGE_NUM_SIZE], 'little')
             # Create new page directory
@@ -426,6 +425,9 @@ class HeapFile:
 
     def read_record(self, byte_id: bytearray):
         page, slot_id = self.find_record(byte_id)
+        if page is None:
+            print('Record not found!')
+            return
         return page.read_record(slot_id)
 
     def find_page(self, page_number):
@@ -464,6 +466,9 @@ class Controller:
 
     def delete(self, id_: int):
         (page, slot_id) = self.heap_file.find_record(utils.encode_record([id_], ['int']))
+        if page is None:
+            print('Record not found!')
+            return
         page.delete_record(slot_id)
 
     def commit(self):
