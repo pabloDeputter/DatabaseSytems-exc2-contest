@@ -193,8 +193,6 @@ class Page:
                     LENGTH_SIZE, 'little')
                 write_ptr += length
 
-            assert int.from_bytes(self.data[4092:4094], 'little') != 0, i
-
         self.page_footer.free_space_pointer = write_ptr
         self.update_header()
 
@@ -426,8 +424,7 @@ class HeapFile:
     def read_record(self, byte_id: bytearray):
         page, slot_id = self.find_record(byte_id)
         if page is None:
-            print('Record not found!')
-            return
+            raise ValueError('Record not found!')
         return page.read_record(slot_id)
 
     def find_page(self, page_number):
@@ -476,21 +473,8 @@ class Controller:
 
 
 if __name__ == '__main__':
-    # # create file database.bin
-    # with open('database.bin', 'r+b') as file:
-    #     file.seek(1024)
-    #     data = file.read(PAGE_SIZE)
-    #
-    #     file.close()
     start = time.time()
     orm = Controller('database.bin')
-
-    # if os.path.exists('users.csv'):
-    #     df = pd.read_csv('users.csv')
-    # else:
-    #     df = utils.generate_data(1)
-    #     df.to_csv('users.csv', index=False)
-    #
 
     # schema = ['int', 'var_str', 'int', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
     # record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
@@ -513,7 +497,19 @@ if __name__ == '__main__':
     # orm.delete(0)
     # orm.delete(9990)
 
-    print(utils.decode_record(orm.read(9990), schema))
+    orm.update(0, (
+        0, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144,
+        'Bhutan', '1992-2-4'), schema)
+    orm.update(1, (
+        1, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144,
+        'Bhutan', '1992-2-4'), schema)
+    orm.update(2, (
+        2, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144,
+        'Bhutan', '1992-2-4'), schema)
+
+    # print(utils.decode_record(orm.read(0), schema))
+    # print(utils.decode_record(orm.read(1), schema))
+    # print(utils.decode_record(orm.read(2), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
