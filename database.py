@@ -180,7 +180,7 @@ class Page:
         """
         write_ptr = 0
 
-        for i, (offset, length) in enumerate(self.page_footer.slot_dir):
+        for i, (offset, length) in sorted(enumerate(self.page_footer.slot_dir), key=lambda x: x[1][0]):
             # Skip deleted records
             if length != 0:
                 if offset != write_ptr:
