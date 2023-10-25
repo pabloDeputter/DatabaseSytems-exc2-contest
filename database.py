@@ -7,9 +7,10 @@ import pandas as pd
 import utils
 
 # Page Constants
-PAGE_SIZE = 512  # Database Page is normally between 512B and 16KB
-OFFSET_SIZE = 4
-LENGTH_SIZE = 4
+PAGE_SIZE = 4096  # Database Page is normally between 512B and 16KB
+# (offset, length) in slot dir
+OFFSET_SIZE = 2
+LENGTH_SIZE = 2
 SLOT_ENTRY_SIZE = OFFSET_SIZE + LENGTH_SIZE
 
 FREE_SPACE_POINTER_SIZE = 4
@@ -23,7 +24,8 @@ CACHE_SIZE = 10
 
 
 class PageFooter:
-    def __init__(self, data: bytearray):
+    def __init__(self, data: bytearray = None):
+        data = bytearray(PAGE_SIZE) if data is None else data
         # Pointer to free space
         self.free_space_pointer = int.from_bytes(data[-FREE_SPACE_POINTER_SIZE:], 'little')
         # Number of slots
@@ -61,7 +63,7 @@ class Page:
         # Page header grows from bottom up, records grow top down.
         # Free space pointer - space occupied by page header - 4 bytes for free space pointer
         return PAGE_SIZE - self.page_footer.free_space_pointer - (
-                len(self.page_footer.slot_dir) * SLOT_ENTRY_SIZE) - FREE_SPACE_POINTER_SIZE
+                len(self.page_footer.slot_dir) * SLOT_ENTRY_SIZE) - FREE_SPACE_POINTER_SIZE - NUMBER_SLOTS_SIZE
 
     @staticmethod
     def calculate_slot_offset(slot_id):
@@ -188,8 +190,10 @@ class Page:
                 new_slot_offset = Page.calculate_slot_offset(i)
                 self.data[new_slot_offset: new_slot_offset + OFFSET_SIZE] = write_ptr.to_bytes(OFFSET_SIZE, 'little')
                 self.data[new_slot_offset + OFFSET_SIZE: new_slot_offset + SLOT_ENTRY_SIZE] = length.to_bytes(
-                    SLOT_ENTRY_SIZE, 'little')
+                    LENGTH_SIZE, 'little')
                 write_ptr += length
+
+            assert int.from_bytes(self.data[4092:4094], 'little') != 0, i
 
         self.page_footer.free_space_pointer = write_ptr
         self.update_header()
@@ -315,7 +319,7 @@ class PageDirectory(Page):
             self.pages[page_num] = page
             return True
 
-        # TODO - idk when this gets executed
+        # Gets executed when space is left in Page
         assert self.file_path is not None
         with open(self.file_path, "rb") as db:
             db.seek(page_num * PAGE_SIZE)
@@ -366,6 +370,9 @@ class HeapFile:
         self.page_directories: list[PageDirectory] = [pd]
 
     def read_page_dir(self, pd: PageDirectory) -> PageDirectory:
+        if new_pd := list(filter(lambda pgd: pgd.pd_number == pd.next_dir, self.page_directories)):
+            return new_pd[0]
+
         with open(self.file_path, 'rb') as db:
             db.seek(pd.next_dir * PAGE_SIZE)
             new_pd = PageDirectory(file_path=self.file_path, data=bytearray(db.read(PAGE_SIZE)))
@@ -417,15 +424,6 @@ class HeapFile:
 
         return None, None
 
-        # for page_dir in self.page_directories:
-        #     for offset, length in page_dir.page_footer.slot_dir:
-        #         page_number = int.from_bytes(page_dir.data[offset: offset + PAGE_NUM_SIZE], 'little')
-        #         page: Page = page_dir.find_page(page_number)
-        #         record = page.find_record(byte_id)
-        #         if record is not None:
-        #             return page, record
-        # return None, None
-
     def read_record(self, byte_id: bytearray):
         page, slot_id = self.find_record(byte_id)
         return page.read_record(slot_id)
@@ -440,7 +438,7 @@ class HeapFile:
         if not os.path.exists(self.file_path):
             with open(self.file_path, 'wb') as file:
                 file.close()
-
+        print("closing")
         with open(self.file_path, 'r+b') as file:
             for page_dir in self.page_directories:
                 file.seek(page_dir.pd_number * PAGE_SIZE)
@@ -488,24 +486,29 @@ if __name__ == '__main__':
     #     df = utils.generate_data(1)
     #     df.to_csv('users.csv', index=False)
     #
-    user_columns = ['id', 'name', 'email', 'phone', 'company', 'street', 'street_number', 'zipcode', 'country',
-                    'birthdate']
 
-    user_schema = ['int', 'var_str', 'var_str', 'var_str', 'var_str', 'var_str', 'int', 'int', 'var_str', 'var_str']
-    schema = ['int', 'var_str', '', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
-    record = (500, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
+    # schema = ['int', 'var_str', 'int', 'int', 'int', 'byte', 'var_str', 'var_str', 'var_str', 'var_str']
+    # record = (1, "Alice", 23, 12345, 987654, 4, "alice@email.com", "1234567890", "ACME", "Elm St")
     # smallrecord = (60, "A", 2, 1, 987654, 4, "", "", "", "")
-    # for i in range(10):
+    record = (47, 'Brian Green', 'michaelfarrell@yahoo.com', '9306399309', 'Cruz LLC', 'Berry Cove', 707, 76486, 'Guam',
+              '1981-1-9')
+    schema = ['int', 'var_str', 'var_str', 'var_str', 'var_str', 'var_str', 'int', 'int', 'var_str', 'var_str']
+    # orm.insert(record, schema)
+    # for i in range(8):
     #     record = (i,) + record[1:]
-    #     orm.insert(smallrecord, schema)
-    #
+    #     orm.insert(record, schema)
+    # orm.insert(smallrecord, schema)
+
     # orm.insert(record, schema)
 
     # orm.update(2, (2, "AAAAAAAAAAAAAAAA", 23, 12345, 987654, 4, "a", "1", "ACME", "Elm St"), schema)
     # orm.delete(5)
     # orm.heap_file.page_directories[0].pages[1].dump()
+    # orm.update(9990, (9990, 'Amanda Robin', 'gonzalezamber@hotmail.com', '(696)381-0879', 'Ramirez LLC', 'Katie Ford', 701, 70144, 'Bhutan', '1992-2-4'), schema)
+    # orm.delete(0)
+    # orm.delete(9990)
 
-    print(utils.decode_record(orm.read(500), schema))
+    print(utils.decode_record(orm.read(9990), schema))
 
     # for i in range(20, 23):
     #     # orm.insert(i.to_bytes(2, 'little'))
@@ -518,3 +521,4 @@ if __name__ == '__main__':
     # print(list(orm.heap_file.page_directories[0].pages.values())[-1].free_space())
     orm.commit()
     print(f"time taken: {time.time() - start}")
+    print(os.path.getsize('database.bin'))

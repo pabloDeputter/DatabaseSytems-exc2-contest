@@ -39,27 +39,27 @@ def test_controller(filepath: str, csv_file: str, num_rows: int):
     write_time = end_time - start_time
     writes_per_second = num_rows / write_time
 
-    # # Reading and Timing
-    # start_time = time.time()
-    # for i, original_row in enumerate(csv_data[1:]):
-    #     casted_original_row = cast_row_based_on_schema(original_row, user_schema)
-    #     read_row = controller.read(i)
-    #     read_row = utils.decode_record(read_row, user_schema)
-    #     assert read_row == casted_original_row, f"Mismatch: Original: {casted_original_row}, Read: {read_row}"
-    #
-    # controller.commit()
-    # end_time = time.time()
-    #
-    # read_time = end_time - start_time
-    # reads_per_second = num_rows / read_time
-    #
-    # total_time = write_time + read_time
+    # Reading and Timing
+    start_time = time.time()
+    for i, original_row in enumerate(csv_data[1:]):
+        casted_original_row = cast_row_based_on_schema(original_row, user_schema)
+        read_row = controller.read(i)
+        read_row = utils.decode_record(read_row, user_schema)
+        assert read_row == casted_original_row, f"Mismatch: Original: {casted_original_row}, Read: {read_row}"
+
+    controller.commit()
+    end_time = time.time()
+
+    read_time = end_time - start_time
+    reads_per_second = num_rows / read_time
+
+    total_time = write_time + read_time
 
     print(f"Inserted {num_rows} records.")
     print(f"Database Size: {os.path.getsize(filepath)}")
     print(f"Writes per second: {writes_per_second}")
-    # print(f"Reads per second: {reads_per_second}")
-    # print(f"Total completion time: {total_time} seconds")
+    print(f"Reads per second: {reads_per_second}")
+    print(f"Total completion time: {total_time} seconds")
 
 
 if __name__ == "__main__":
