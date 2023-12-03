@@ -2,7 +2,7 @@ import time
 import csv
 import os
 from typing import List
-from database import Controller
+from controller import Controller
 import utils
 
 
@@ -65,7 +65,7 @@ def test_controller(filepath: str, csv_file: str, num_rows: int):
 
 if __name__ == "__main__":
     user_schema = ['int', 'var_str', 'var_str', 'var_str', 'var_str', 'var_str', 'int', 'int', 'var_str', 'var_str']
-    num_rows = 10000
+    num_rows = 100
     filepath = "database.bin"
     csv_file = "fake_users.csv"
 
